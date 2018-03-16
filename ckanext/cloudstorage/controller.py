@@ -8,6 +8,8 @@ from pylons.i18n import _
 from ckan import logic, model
 from ckan.lib import base, uploader
 import ckan.lib.helpers as h
+from webob.exc import status_map
+from ckan.common import is_flask_request
 
 log = logging.getLogger(__name__)
 
@@ -53,9 +55,6 @@ class StorageController(base.BaseController):
         if uploaded_url is None:
             base.abort(404, _('No download is available'))
 
-        from ckan.common import is_flask_request
-        log.warning('flask request {}'.format(is_flask_request()))
-
         h.redirect_to(uploaded_url)
 
     def uploaded_file_redirect(self, upload_to, filename):
@@ -63,6 +62,14 @@ class StorageController(base.BaseController):
         upload = uploader.get_uploader('notused')
         file_path = upload.path_from_filename(filename)
         uploaded_url = upload.get_url_from_path(file_path, use_secure_urls=False)
-        from ckan.common import is_flask_request
-        log.warning('flask request {}'.format(is_flask_request()))
-        h.redirect_to(uploaded_url)
+
+        if is_flask_request():
+            raise NotImplementedError("Permanent redirect for flask requests is not implemented yet")
+        else:
+            # We are manually performing a redirect for Pylons
+            # as this is the only way to set the caching headers
+            # (see https://github.com/Pylons/pylons/blob/master/pylons/controllers/util.py#L218-L229)
+            exc = status_map[301]
+            raise exc(location=uploaded_url.encode('utf-8'), headers={"Cache-Control": "public, max-age=3600", "Pragma": "none"})
+
+        # h.redirect_to(uploaded_url)
