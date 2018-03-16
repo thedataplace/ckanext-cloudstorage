@@ -63,4 +63,6 @@ class StorageController(base.BaseController):
         upload = uploader.get_uploader('notused')
         file_path = upload.path_from_filename(filename)
         uploaded_url = upload.get_url_from_path(file_path, use_secure_urls=False)
+        from ckan.common import is_flask_request
+        log.warning('flask request {}'.format(is_flask_request()))
         h.redirect_to(uploaded_url)
