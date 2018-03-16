@@ -4,12 +4,12 @@ import os.path
 import logging
 
 from pylons import c
-from pylons.i18n import _ 
+from pylons.i18n import _
+from webob.exc import status_map
 from ckan import logic, model
 from ckan.lib import base, uploader
-import ckan.lib.helpers as h
-from webob.exc import status_map
 from ckan.common import is_flask_request
+import ckan.lib.helpers as h
 
 log = logging.getLogger(__name__)
 
