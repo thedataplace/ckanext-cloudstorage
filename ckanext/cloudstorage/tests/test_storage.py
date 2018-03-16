@@ -55,8 +55,6 @@ class TestResourceUploader(helpers.FunctionalTestBase):
         args, kwargs = container.upload_object_via_stream.call_args
 
         assert_equal(kwargs['object_name'], key)
-        print('driver method calls', mock_driver.method_calls)
-        print('container method calls', container.method_calls)
 
     @patch('ckanext.cloudstorage.storage.get_driver')
     def test_resource_upload_then_clear(self, get_driver):
@@ -122,84 +120,129 @@ class TestResourceUploader(helpers.FunctionalTestBase):
         app.post(url, {'clear_uplaod': True, 'id': '', # empty id from the form
             'url': 'http://asdf', 'save': 'save'}, extra_environ=env)
 
+    @helpers.change_config('ckanext.cloudstorage.use_secure_urls', True)
+    @patch('ckanext.cloudstorage.storage.get_driver')
+    @patch('ckanext.cloudstorage.storage.CloudStorage.get_url_from_path')
+    def test_path_from_filename_uses_secure_url_when_config_is_set(self, get_url_from_path, get_driver):
+        dataset = factories.Dataset(name='my-dataset')
+        resource = factories.Resource(
+            package_id=dataset['id'],
+        )
+
+        uploader = ResourceCloudStorage(resource)
+        uploader.get_url_from_filename(resource['id'], 'myfile.txt')
+        get_url_from_path.assert_called_once_with('resources/{}/myfile.txt'
+            .format(resource['id']), True)
+
+    @helpers.change_config('ckanext.cloudstorage.use_secure_urls', False)
+    @patch('ckanext.cloudstorage.storage.get_driver')
+    @patch('ckanext.cloudstorage.storage.CloudStorage.get_url_from_path')
+    def test_path_from_filename_uses_secure_url_when_option_is_false(self, get_url_from_path, get_driver):
+        dataset = factories.Dataset(name='my-dataset')
+        resource = factories.Resource(
+            package_id=dataset['id'],
+        )
+
+        uploader = ResourceCloudStorage(resource)
+        uploader.get_url_from_filename(resource['id'], 'myfile.txt')
+        get_url_from_path.assert_called_once_with('resources/{}/myfile.txt'.format(resource['id']), False)
+
 
 class TestFileCloudStorage(helpers.FunctionalTestBase):
 
-#     # @patch('ckanext.cloudstorage.storage.get_driver')
-#     def test_group_image_uplaod(self):
-#         """Test a group image file uplaod."""
-#         # mock_driver = MagicMock(spec=google_driver, name='driver')
-#         # container = MagicMock(name='container')
-#         # mock_driver.get_container.return_value = container
-#         # mock_driver.get_object_cdn_url.return_value = 'http://cdn.url'
-#         # get_driver.return_value = MagicMock(return_value=mock_driver)
+    @patch('ckanext.cloudstorage.storage.FileCloudStorage')
+    def test_file_upload_calls_FileCloudStorage(self, FileCloudStorage):
+        sysadmin = factories.Sysadmin(apikey='apikey')
 
-#         sysadmin = factories.Sysadmin(apikey='my-test-key')
+        file_path = os.path.join(os.path.dirname(__file__), 'data.csv')
+        filename = 'image.png'
 
-#         file_path = os.path.join(os.path.dirname(__file__), 'data.csv')
-#         filename = 'image.png'
+        img_uploader = Uploader(filename, file=open(file_path))
 
-#         img_uploader = Uploader(filename, file=open(file_path))
+        with patch('ckanext.cloudstorage.storage.datetime') as mock_date:
+            mock_date.datetime.utcnow.returl_value = datetime.datetime(2001, 1, 29)
+            context = {'user': sysadmin['name']}
+            helpers.call_action('group_create', context=context,
+                                name='group',
+                                image_upload=img_uploader,
+                                image_url=filename,
+                                save='save')
 
-#         with patch('ckanext.cloudstorage.storage.datetime') as mock_date:
-#             mock_date.datetime.utcnow.return_value = \
-#                 datetime.datetime(2001, 1, 29)
-#             context = {'user': sysadmin['name']}
-#             helpers.call_action('group_create', context=context,
-#                                 name='my-group',
-#                                 image_uplaods=img_uploader,
-#                                 image_url=filename,
-#                                 save='save')
+        FileCloudStorage.assert_called_once_with('group', None)
 
-#         key = "storage/uploads/group/2001-01-29-000000{0}" \
-#             .format(filename)
+    @patch('ckanext.cloudstorage.storage.get_driver')
+    def test_group_image_upload(self, get_driver):
+        """Test a group image file uplaod."""
+        mock_driver = MagicMock(spec=google_driver, name='driver')
+        container = MagicMock(name='container')
+        mock_driver.get_container.return_value = container
+        mock_driver.get_object_cdn_url.return_value = 'http://cdn.url'
+        get_driver.return_value = MagicMock(return_value=mock_driver)
 
-#         group = helpers.call_action('group_show', id='my-group')
-#         print('group', group)
+        sysadmin = factories.Sysadmin(apikey='my-test-key')
 
-#         # args, kwargs = container.upload_object_via_datastream.call_args
-#         # assert_equal(kwargs['object_name'], key)
+        file_path = os.path.join(os.path.dirname(__file__), 'data.csv')
+        filename = 'image.png'
 
-#         app = self._get_test_app()
-#         image_file_url = '/uploads/group/{0}'.format(filename)
-#         r = app.get(image_file_url)
+        img_uploader = Uploader(filename, file=open(file_path))
 
-#     # @patch('ckanext.cloudstorage.storage.get_driver')
-#     # @patch('ckanext.cloudstorage.storage.FileCloudStorage.upload')
-#     def test_group_image_upload_then_clear(self):
-#         """Test that clearing an upload calls delete_object"""
-#         # mock_driver = MagicMock(spec=google_driver, name='driver')
-#         # container = MagicMock(name='container')
-#         # mock_driver.get_container.return_value = container
-#         # get_driver.return_value = MagicMock(return_value=mock_driver)
+        with patch('ckanext.cloudstorage.storage.datetime') as mock_date:
+            mock_date.datetime.utcnow.return_value = \
+                datetime.datetime(2001, 1, 29)
+            context = {'user': sysadmin['name']}
+            helpers.call_action('group_create', context=context,
+                                name='my-group',
+                                image_upload=img_uploader,
+                                image_url=filename,
+                                save='save')
 
-#         sysadmin = factories.Sysadmin(apikey='my-test-apikey')
+        key = "storage/uploads/2001-01-29-000000{0}" \
+            .format(filename)
 
-#         file_path = os.path.join(os.path.dirname(__file__), 'data.csv')
-#         file_name = 'image.png'
+        group = helpers.call_action('group_show', id='my-group')
+        print('group', group)
 
-#         img_uploader = Uploader(file_name, file=open(file_path))
+        args, kwargs = container.upload_object_via_stream.call_args
+        assert_equal(kwargs['object_name'], unicode(key))
 
-#         with patch('ckanext.cloudstorage.storage.datetime') as mock_date:
-#             mock_date.datetime.utcnow.return_value = \
-#                 datetime.datetime(2001, 1, 29)
-#             context = {'user': sysadmin['name']}
-#             helpers.call_action('group_create', context=context,
-#                                 name='my-group',
-#                                 image_uplaod=img_uploader,
-#                                 image_url=file_name)
+        # app = self._get_test_app()
+        # image_file_url = '/uploads/group/{0}'.format(filename)
+        # r = app.get(image_file_url)
 
-#         key = 'storage/uploads/group/2001-01-29-000000{0}' \
-#             .format(file_name)
+    @patch('ckanext.cloudstorage.storage.get_driver')
+    def test_group_image_upload_then_clear(self, get_driver):
+        """Test that clearing an upload calls delete_object"""
+        mock_driver = MagicMock(spec=google_driver, name='driver')
+        container = MagicMock(name='container')
+        mock_driver.get_container.return_value = container
+        get_driver.return_value = MagicMock(return_value=mock_driver)
 
-#         # assert uplaod was called
-#         # upload.assert_called() 
+        sysadmin = factories.Sysadmin(apikey='my-test-apikey')
 
-#         helpers.call_action('group_update', context=context,
-#                             id='my-group', name='my-group',
-#                             image_url='http://example', clear_update=True)
-#         # assert delete object is called
-#         # container.delete_object.assert_called()
+        file_path = os.path.join(os.path.dirname(__file__), 'data.csv')
+        file_name = 'image.png'
+
+        img_uploader = Uploader(file_name, file=open(file_path))
+
+        with patch('ckanext.cloudstorage.storage.datetime') as mock_date:
+            mock_date.datetime.utcnow.return_value = \
+                datetime.datetime(2001, 1, 29)
+            context = {'user': sysadmin['name']}
+            helpers.call_action('group_create', context=context,
+                                name='my-group',
+                                image_upload=img_uploader,
+                                image_url=file_name)
+
+        object_mock = MagicMock(name='object')
+        container.get_object.return_value = object_mock
+
+        helpers.call_action('group_update', context=context,
+                            id='my-group', name='my-group',
+                            image_url='http://example', clear_upload=True)
+
+        # assert delete object is called
+        container.delete_object.assert_called_with(object_mock)
+
     @patch('ckanext.cloudstorage.storage.get_driver')
     def test_get_object_public_url(self, get_driver):
         """
@@ -209,7 +252,52 @@ class TestFileCloudStorage(helpers.FunctionalTestBase):
         url = uploader.get_object_public_url('file.png')
         assert_equal(url, 'https://storage.googleapis.com/test/storage/uploads/file.png')
 
+    @helpers.change_config('ckanext.cloudstorage.use_secure_urls', True)
+    @patch('ckanext.cloudstorage.storage.get_driver')
+    @patch('ckanext.cloudstorage.storage.CloudStorage.get_url_from_path')
+    def test_path_from_filename_uses_public_url_when_secure_urls_is_set(self, get_url_from_path, get_driver):
+        sysadmin = factories.Sysadmin(apikey='my-test-apikey')
 
+        file_path = os.path.join(os.path.dirname(__file__), 'data.csv')
+        file_name = 'image.png'
 
+        img_uploader = Uploader(file_name, file=open(file_path))
 
+        with patch('ckanext.cloudstorage.storage.datetime') as mock_date:
+            mock_date.datetime.utcnow.return_value = \
+                datetime.datetime(2001, 1, 29)
+            context = {'user': sysadmin['name']}
+            helpers.call_action('group_create', context=context,
+                                name='my-group',
+                                image_upload=img_uploader,
+                                image_url=file_name)
 
+        uploader = FileCloudStorage(None)
+
+        uploader.get_url_from_filename('image.png')
+        get_url_from_path.assert_called_once_with(u'storage/uploads/image.png', use_secure_urls=False)
+
+    @helpers.change_config('ckanext.cloudstorage.use_secure_urls', False)
+    @patch('ckanext.cloudstorage.storage.get_driver')
+    @patch('ckanext.cloudstorage.storage.CloudStorage.get_url_from_path')
+    def test_path_from_filename_uses_public_url_when_option_is_false(self, get_url_from_path, get_driver):
+        sysadmin = factories.Sysadmin(apikey='my-test-apikey')
+
+        file_path = os.path.join(os.path.dirname(__file__), 'data.csv')
+        file_name = 'image.png'
+
+        img_uploader = Uploader(file_name, file=open(file_path))
+
+        with patch('ckanext.cloudstorage.storage.datetime') as mock_date:
+            mock_date.datetime.utcnow.return_value = \
+                datetime.datetime(2001, 1, 29)
+            context = {'user': sysadmin['name']}
+            helpers.call_action('group_create', context=context,
+                                name='my-group',
+                                image_upload=img_uploader,
+                                image_url=file_name)
+
+        uploader = FileCloudStorage(None)
+
+        uploader.get_url_from_filename('image.png')
+        get_url_from_path.assert_called_once_with(u'storage/uploads/image.png', use_secure_urls=False)

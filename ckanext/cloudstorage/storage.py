@@ -134,8 +134,9 @@ class CloudStorage(object):
     @property
     def can_use_advanced_google_cloud(self):
         """
-        `True` if the `google-cloud` module is installed and ckanext-cloudstorage has
-        been configured to use Google Cloud Storage, otherwise `False`.
+        `True` if the `google-cloud` module is installed and
+        ckanext-cloudstorage has been configured to use Google Cloud Storage,
+        otherwise `False`.
         """
         # Are we even using google cloud?
         if 'GOOGLE_STORAGE' in self.driver_name:
@@ -172,9 +173,11 @@ class CloudStorage(object):
             if self.use_secure_urls:
                 raise NotImplementedError("Should be pretty easy though!")
             return "https://storage.googleapis.com/{0}/{1}" \
-                    .format(self.container_name, self.path_from_filename(filename))
+                .format(self.container_name,
+                        self.path_from_filename(filename))
         else:
-            raise NotImplementedError("This method hasn't been implemented yet for this driver.")
+            raise NotImplementedError(
+                    "This method hasn't been implemented yet for this driver.")
 
     def upload_to_path(self, file_path):
         """
@@ -234,7 +237,7 @@ class CloudStorage(object):
             # outstanding lease.
             return
 
-    def get_url_from_path(self, path):
+    def get_url_from_path(self, path, use_secure_urls):
         """
         Retrieve a publically accessible URL for the given path
 
@@ -249,7 +252,7 @@ class CloudStorage(object):
         """
         # If advanced azure features are enabled, generate a temporary
         # shared access link instead of simply redirecting to the file.
-        if self.use_secure_urls:
+        if use_secure_urls:
             if self.can_use_advanced_azure:
                 from azure.storage import blob as azure_blob
 
@@ -403,8 +406,7 @@ class ResourceCloudStorage(CloudStorage):
         :param filename: The resource filename
         """
         path = self.path_from_filename(id, filename)
-        return self.get_url_from_path(path)
-
+        return self.get_url_from_path(path, self.use_secure_urls)
 
     @property
     def package(self):
@@ -447,7 +449,6 @@ class FileCloudStorage(CloudStorage):
         :param clear_field: Name of a boolean field which requests the upload
         to be deleted
         """
-
         self.url = data_dict.get(url_field, '')
         self._clear = data_dict.pop(clear_field, None)
         self.file_field = file_field
@@ -481,7 +482,7 @@ class FileCloudStorage(CloudStorage):
             return self.upload_to_path(file_path)
         if self._clear and self.old_filename and not self.leave_files:
             old_file_path = self.path_from_filename(self.old_filename)
-            self.delete_object_from_path(old_file_path) 
+            self.delete_object_from_path(old_file_path)
 
     def get_url_from_filename(self, filename):
         """
@@ -489,5 +490,8 @@ class FileCloudStorage(CloudStorage):
         :param filename: name of file
         """
         path = self.path_from_filename(filename)
-        return self.get_url_from_path(path)
+        # We don't want to use secure urls for normal file uploads.
+        # Doing so would cause assets caching issues such as the logo
+        # to be reloaded on every page load.
+        return self.get_url_from_path(path, use_secure_urls=False)
 
