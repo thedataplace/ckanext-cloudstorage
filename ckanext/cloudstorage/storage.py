@@ -216,6 +216,7 @@ class CloudStorage(object):
             extra = {}
             if 'GOOGLE_STORAGE' in self.driver_name:
                 extra['x-goog-acl'] = 'public-read'
+                extra['acl'] = 'public-read'
                 log.info('set acl of new object to public-read')
 
             self.container.upload_object_via_stream(
