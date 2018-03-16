@@ -11,9 +11,12 @@ from pylons import config
 from ckan import model
 from ckan.lib import munge
 import ckan.plugins as p
+import logging
 
 from libcloud.storage.types import Provider, ObjectDoesNotExistError
 from libcloud.storage.providers import get_driver
+
+log = logging.getLogger(__name__)
 
 
 class CloudStorage(object):
@@ -213,6 +216,7 @@ class CloudStorage(object):
             extra = {}
             if 'GOOGLE_STORAGE' in self.driver_name:
                 extra['acl'] = 'public-read'
+                log.info('set acl of new object to public-read')
 
             self.container.upload_object_via_stream(
                 self.file_upload,
