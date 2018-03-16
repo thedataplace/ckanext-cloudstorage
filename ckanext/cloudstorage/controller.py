@@ -1,12 +1,15 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import os.path
+import logging
 
 from pylons import c
 from pylons.i18n import _ 
 from ckan import logic, model
 from ckan.lib import base, uploader
 import ckan.lib.helpers as h
+
+log = logging.getLogger(__name__)
 
 
 class StorageController(base.BaseController):
@@ -49,6 +52,9 @@ class StorageController(base.BaseController):
         # provider being down.
         if uploaded_url is None:
             base.abort(404, _('No download is available'))
+
+        from ckan.common import is_flask_request
+        log.warning('flask request {}'.format(is_flask_request()))
 
         h.redirect_to(uploaded_url)
 
