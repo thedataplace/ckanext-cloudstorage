@@ -207,9 +207,14 @@ class CloudStorage(object):
                 content_settings=content_settings
             )
         else:
+            extra = {}
+            if 'GOOGLE_STORAGE' in self.driver_name:
+                extra['acl'] = 'public-read'
+
             self.container.upload_object_via_stream(
                 self.file_upload,
-                object_name=file_path
+                object_name=file_path,
+                extra=extra
             )
 
     def delete_object_from_path(self, file_path):
