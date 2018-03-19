@@ -24,8 +24,7 @@ class Uploader(Upload):
 
     def __init__(self, *args, **kwargs):
         self.file = kwargs.pop('file')
-        super(Uplaoder, self).__init__(*args, **kwargs)
-
+        super(Uploader, self).__init__(*args, **kwargs)
 
 
 class TestStorageController(helpers.FunctionalTestBase):

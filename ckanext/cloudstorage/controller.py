@@ -61,15 +61,24 @@ class StorageController(base.BaseController):
         '''Redirect static file requests to their location on cloudstorage.'''
         upload = uploader.get_uploader('notused')
         file_path = upload.path_from_filename(filename)
-        uploaded_url = upload.get_url_from_path(file_path, use_secure_urls=False)
+        uploaded_url = upload.get_url_from_path(file_path)
 
-        if is_flask_request():
-            raise NotImplementedError("Permanent redirect for flask requests is not implemented yet")
+        if upload.use_secure_urls:
+            h.redirect_to(uploaded_url)
         else:
-            # We are manually performing a redirect for Pylons
-            # as this is the only way to set the caching headers
-            # (see https://github.com/Pylons/pylons/blob/master/pylons/controllers/util.py#L218-L229)
-            exc = status_map[301]
-            raise exc(location=uploaded_url.encode('utf-8'), headers={"Cache-Control": "public, max-age=3600", "Pragma": "none"})
-
-        # h.redirect_to(uploaded_url)
+            if is_flask_request():
+                raise NotImplementedError("Permanent redirect for flask \
+                    requests is not implemented yet")
+            else:
+                # We are manually performing a redirect for Pylons
+                # as this is the only way to set the caching headers
+                # to make a Permanently Moved cachable
+                # (see https://github.com/Pylons/pylons/blob/master/pylons/controllers/util.py#L218-L229)
+                exc = status_map[301]
+                raise exc(
+                    location=uploaded_url.encode('utf-8'),
+                    headers={
+                        "Cache-Control": "public, max-age=3600",
+                        "Pragma": "none"
+                    }
+                )
