@@ -209,8 +209,14 @@ class CloudStorage(object):
         else:
             extra = {}
             if 'GOOGLE_STORAGE' in self.driver_name:
-                log.debug('set acl of new object to public-read for GOOGLE_STORAGE')
-                extra['acl'] = 'public-read'
+                use_secure_urls = p.toolkit.asbool(
+                    config.get('ckanext.cloudstorage.use_secure_urls', False))
+                use_secure_urls_for_generics = p.toolkit.asbool(
+                        config.get('ckanext.cloudstorage.use_secure_urls_for_generics', False))
+                set_public_acl = use_secure_urls is True and use_secure_urls_for_generics is False
+                if set_public_acl:
+                    log.debug('set acl of new object to public-read for GOOGLE_STORAGE')
+                    extra['acl'] = 'public-read'
 
             self.container.upload_object_via_stream(
                 self.file_upload,
