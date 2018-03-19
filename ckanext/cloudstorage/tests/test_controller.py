@@ -1,6 +1,6 @@
 import os
 
-from nose.tools import assert_equal, assert_true
+from nose.tools import assert_equal, assert_true, assert_raises
 from mock import patch, create_autospec, MagicMock
 
 import ckan.plugins
@@ -14,6 +14,8 @@ from libcloud.storage.types import Provider
 from libcloud.storage.providers import get_driver
 
 from ckanext.cloudstorage.controller import StorageController
+
+from webob.exc import status_map
 
 google_driver = get_driver(Provider.GOOGLE_STORAGE)
 
@@ -122,4 +124,31 @@ class TestStorageController(helpers.FunctionalTestBase):
         # attempt redirect to linked url
         r = app.get(resource_file_url)
         h.redirect_to.assert_called_with('http://example')
+
+
+class TestControllerUploadFileRedirect(helpers.FunctionalTestBase):
+
+    @helpers.change_config('ckanext.cloudstorage.use_secure_urls_for_generics', True)
+    @patch('ckanext.cloudstorage.storage.FileCloudStorage.get_url_from_path')
+    @patch('ckanext.cloudstorage.storage.get_driver')
+    @patch('ckanext.cloudstorage.controller.h.redirect_to')
+    def test_uses_normal_redirect_for_secure_urls(self, redirect_to, get_driver, get_url_from_path):
+        url = 'http://some.url/path'
+        get_url_from_path.return_value = url
+
+        StorageController().uploaded_file_redirect('notused', 'file.txt')
+        redirect_to.assert_called_once_with(url)
+
+    @helpers.change_config('ckanext.cloudstorage.use_secure_urls_for_generics', False)
+    @patch('ckanext.cloudstorage.storage.FileCloudStorage.get_url_from_path')
+    @patch('ckanext.cloudstorage.storage.get_driver')
+    @patch('ckanext.cloudstorage.controller.h.redirect_to')
+    def test_uses_manual_pylons_redirect_for_unsecure_urls_redirect(self, redirect_to, get_driver, get_url_from_path):
+        url = 'http://some.url/path'
+        get_url_from_path.return_value = url
+
+        with assert_raises(status_map[301]) as exc:
+            StorageController().uploaded_file_redirect('notused', 'file.txt')
+        assert_equal(exc.exception.location, url)
+        assert_equal(exc.exception.headers['Pragma'], 'none')
 
